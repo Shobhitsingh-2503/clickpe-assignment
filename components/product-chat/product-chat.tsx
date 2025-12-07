@@ -26,6 +26,7 @@ export function ProductChat({ product }: { product: Product }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -42,6 +43,7 @@ export function ProductChat({ product }: { product: Product }) {
   }, [messages]);
 
   async function fetchMessages() {
+    setIsFetching(true);
     try {
       const url = new URL("/api/chat", window.location.href);
       url.searchParams.append("productId", product.id);
@@ -54,6 +56,8 @@ export function ProductChat({ product }: { product: Product }) {
       }
     } catch (error) {
       console.error("Failed to fetch messages", error);
+    } finally {
+      setIsFetching(false);
     }
   }
 
@@ -117,62 +121,71 @@ export function ProductChat({ product }: { product: Product }) {
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 my-4 space-y-4 p-4 rounded-md border bg-gray-50/50">
-          {messages.length === 0 && !isLoading && (
+          {isFetching ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-4">
-              <MessageSquare className="h-8 w-8 mb-2 opacity-50" />
-              <p className="text-sm">
-                Ask anything about this loan product, like interest rates or
-                eligibility.
-              </p>
+              <Loader2 className="h-8 w-8 animate-spin mb-2" />
+              <p className="text-sm">Loading conversation...</p>
             </div>
-          )}
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={`flex ${
-                m.role === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
-                  m.role === "user"
-                    ? "bg-blue-600 text-white rounded-br-none"
-                    : "bg-white border text-gray-800 rounded-bl-none"
-                }`}
-              >
-                <ReactMarkdown
-                  components={{
-                    ul: ({ node, ...props }: any) => (
-                      <ul
-                        className="list-disc pl-4 space-y-1 my-1"
-                        {...props}
-                      />
-                    ),
-                    ol: ({ node, ...props }: any) => (
-                      <ol
-                        className="list-decimal pl-4 space-y-1 my-1"
-                        {...props}
-                      />
-                    ),
-                    p: ({ node, ...props }: any) => (
-                      <p className="mb-1 last:mb-0" {...props} />
-                    ),
-                    strong: ({ node, ...props }: any) => (
-                      <span className="font-bold" {...props} />
-                    ),
-                  }}
+          ) : (
+            <>
+              {messages.length === 0 && !isLoading && (
+                <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-4">
+                  <MessageSquare className="h-8 w-8 mb-2 opacity-50" />
+                  <p className="text-sm">
+                    Ask anything about this loan product, like interest rates or
+                    eligibility.
+                  </p>
+                </div>
+              )}
+              {messages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex ${
+                    m.role === "user" ? "justify-end" : "justify-start"
+                  }`}
                 >
-                  {m.content}
-                </ReactMarkdown>
-              </div>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-white border text-gray-800 rounded-2xl rounded-bl-none px-4 py-2 text-sm shadow-sm flex items-center gap-2">
-                <Loader2 className="h-3 w-3 animate-spin" /> Thinking...
-              </div>
-            </div>
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
+                      m.role === "user"
+                        ? "bg-blue-600 text-white rounded-br-none"
+                        : "bg-white border text-gray-800 rounded-bl-none"
+                    }`}
+                  >
+                    <ReactMarkdown
+                      components={{
+                        ul: ({ node, ...props }: any) => (
+                          <ul
+                            className="list-disc pl-4 space-y-1 my-1"
+                            {...props}
+                          />
+                        ),
+                        ol: ({ node, ...props }: any) => (
+                          <ol
+                            className="list-decimal pl-4 space-y-1 my-1"
+                            {...props}
+                          />
+                        ),
+                        p: ({ node, ...props }: any) => (
+                          <p className="mb-1 last:mb-0" {...props} />
+                        ),
+                        strong: ({ node, ...props }: any) => (
+                          <span className="font-bold" {...props} />
+                        ),
+                      }}
+                    >
+                      {m.content}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white border text-gray-800 rounded-2xl rounded-bl-none px-4 py-2 text-sm shadow-sm flex items-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Thinking...
+                  </div>
+                </div>
+              )}
+            </>
           )}
           <div ref={bottomRef} />
         </div>
