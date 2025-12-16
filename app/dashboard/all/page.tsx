@@ -20,15 +20,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useDebounce } from "@/hooks/useDebounce";
 import supabase from "@/lib/supabaseClient";
 import { Product } from "@/lib/types";
 import { Filter, RefreshCcw, Search, X } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 
+const ITEMS_PER_PAGE = 10;
+
 const AllProductPage = () => {
   const [data, setData] = useState<Product[] | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState("");
@@ -42,38 +57,45 @@ const AllProductPage = () => {
   const debouncedIncome = useDebounce(minIncome, 500);
   const debouncedCreditScore = useDebounce(minCreditScore, 500);
 
+  // Reset page to 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, debouncedApr, debouncedIncome, debouncedCreditScore]);
+
   const getProducts = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase.from("products").select("*");
+      // 1. Select with count: 'exact' to get total rows for pagination
+      let query = supabase.from("products").select("*", { count: "exact" });
 
       // Server-side Filtering
-
-      // Search Query (Bank or Name)
       if (debouncedSearch) {
         query = query.or(
           `bank.ilike.%${debouncedSearch}%,name.ilike.%${debouncedSearch}%`
         );
       }
 
-      // APR Range (assuming rate_apr is in basis points or similar scale as original code: * 100)
       if (debouncedApr) {
         query = query
           .gte("rate_apr", debouncedApr[0] * 100)
           .lte("rate_apr", debouncedApr[1] * 100);
       }
 
-      // Min Income
       if (debouncedIncome) {
         query = query.lte("min_income", parseInt(debouncedIncome));
       }
 
-      // Min Credit Score
       if (debouncedCreditScore) {
         query = query.lte("min_credit_score", parseInt(debouncedCreditScore));
       }
 
-      const { data, error } = await query;
+      // 2. Pagination Logic
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      query = query.range(from, to);
+
+      const { data, count, error } = await query;
 
       if (error) {
         console.log(error);
@@ -81,13 +103,20 @@ const AllProductPage = () => {
 
       if (data) {
         setData(data);
+        if (count !== null) setTotalCount(count);
       }
     } catch (error) {
       console.log(error);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, debouncedApr, debouncedIncome, debouncedCreditScore]);
+  }, [
+    debouncedSearch,
+    debouncedApr,
+    debouncedIncome,
+    debouncedCreditScore,
+    page, // Add page dependency
+  ]);
 
   useEffect(() => {
     getProducts();
@@ -114,7 +143,10 @@ const AllProductPage = () => {
     setAprRange([0, 30]);
     setMinIncome("");
     setMinCreditScore("");
+    setPage(1);
   };
+
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
   // Shared Filter Inputs
   const AprFilter = () => (
@@ -163,7 +195,7 @@ const AllProductPage = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">All Products</h1>
         <p className="text-muted-foreground">
@@ -253,7 +285,7 @@ const AllProductPage = () => {
           <span className="font-medium text-foreground">
             {data?.length || 0}
           </span>{" "}
-          results
+          results (Total: {totalCount})
         </div>
 
         {(searchQuery ||
@@ -311,7 +343,7 @@ const AllProductPage = () => {
       </div>
 
       {/* Products */}
-      <Card className="rounded-md border bg-white h-[calc(100vh-300px)] overflow-y-auto">
+      <Card className="rounded-md border bg-white h-[calc(100vh-350px)] overflow-y-auto">
         <Table>
           <TableHeader className="sticky top-0 z-10 font-bold bg-white shadow-sm">
             <TableRow>
@@ -434,6 +466,69 @@ const AllProductPage = () => {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Pagination Component */}
+      {totalPages > 1 && (
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-disabled={page === 1}
+                className={
+                  page === 1
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+
+            {/* Simple Pagination Logic: Show current page and neighbors */}
+            {[...Array(totalPages)].map((_, i) => {
+              const p = i + 1;
+              // Show first, last, current, and neighbors
+              if (
+                p === 1 ||
+                p === totalPages ||
+                (p >= page - 1 && p <= page + 1)
+              ) {
+                return (
+                  <PaginationItem key={p}>
+                    <PaginationLink
+                      isActive={page === p}
+                      onClick={() => setPage(p)}
+                      className="cursor-pointer"
+                    >
+                      {p}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              }
+              // Show ellipsis for gaps
+              if (p === page - 2 || p === page + 2) {
+                return (
+                  <PaginationItem key={p}>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                );
+              }
+              return null;
+            })}
+
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                aria-disabled={page === totalPages}
+                className={
+                  page === totalPages
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 };
