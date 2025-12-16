@@ -60,10 +60,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <Sidebar className="bg-white">
         <SidebarHeader className="bg-gray-100">
-          <div className="text-center font-bold text-md">
-            Loan Mangement Assignment
+          <div className="text-center font-bold text-md p-1">
+            CreditFlow Advisor
           </div>
-          <div className="text-xs text-center">Submitted By: Shobhit Singh</div>
         </SidebarHeader>
         <SidebarContent className="bg-white">
           <SidebarGroup>
